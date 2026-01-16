@@ -1,12 +1,12 @@
 <?php
 /**
- * Cerbero-PHP v2.0 - Bunker Edition
+ * Cerbero-PHP v2.1 - Bunker & Stealth Edition
  * Protegido contra VoidLink, WebShells y Symlink Attacks
+ * Corrección v2.1: Ocultación de archivos de sistema (.htaccess)
  */
 
 // --- CONFIGURACIÓN BLINDADA ---
 // Guardamos los archivos FUERA del /html público.
-// Aunque un hacker suba un virus, no hay URL para ejecutarlo.
 $config = [
     'storageDir'   => '/var/www/cerbero_boveda', 
     'password'     => '', // OPCIONAL: Pon tu contraseña aquí
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'upload') {
         
         // A. Chequeo de Malware
         if (isMalware($_FILES['file']['tmp_name'])) {
-            die(" ALERTA DE SEGURIDAD: Se ha detectado un archivo ejecutable/script. Subida rechazada.");
+            die("🚨 ALERTA DE SEGURIDAD: Se ha detectado un archivo ejecutable/script. Subida rechazada.");
         }
 
         // B. Saneamiento de nombre
@@ -93,17 +93,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'delete') {
     $safeName = sanitizeName($_POST['path'] ?? '');
     $path = $config['storageDir'] . DIRECTORY_SEPARATOR . $safeName;
     
+    // Evitamos borrar el .htaccess aunque alguien adivine el nombre
+    if ($safeName === '.htaccess') die("Acceso Denegado: Archivo de sistema protegido.");
+
     if (file_exists($path) && is_file($path)) unlink($path);
     header("Location: index.php"); exit;
 }
 
-// DESCARGA (Proxy seguro: El usuario nunca toca el archivo real)
+// DESCARGA (Proxy seguro)
 if ($action === 'download') {
     $safeName = sanitizeName($_GET['file'] ?? '');
+    
+    // Bloqueo explícito de descarga de configuración
+    if ($safeName === '.htaccess') die("Acceso Denegado.");
+
     $path = $config['storageDir'] . DIRECTORY_SEPARATOR . $safeName;
 
     if (file_exists($path) && is_file($path)) {
-        // Limpiamos buffer para evitar corrupción
         if (ob_get_level()) ob_end_clean();
         header('Content-Description: File Transfer');
         header('Content-Type: application/octet-stream');
@@ -120,7 +126,9 @@ if ($action === 'download') {
 $files = [];
 if (is_dir($config['storageDir'])) {
     foreach (scandir($config['storageDir']) as $f) {
-        if ($f === '.' || $f === '..') continue;
+        // CORRECCIÓN v2.1: Ocultar archivos de sistema y navegación
+        if ($f === '.' || $f === '..' || $f === '.htaccess') continue;
+        
         $p = $config['storageDir'] . '/' . $f;
         $files[] = ['n'=>$f, 's'=>filesize($p), 'h'=>humanSize(filesize($p)), 't'=>filemtime($p)];
     }
@@ -153,7 +161,7 @@ if (is_dir($config['storageDir'])) {
 </head>
 <body>
     <div class="container">
-        <h1> Cerbero <span style="font-size:0.6em; color:#bdc3c7; font-weight:normal;">Bunker Edition v2.0</span></h1>
+        <h1>🛡️ Cerbero <span style="font-size:0.6em; color:#bdc3c7; font-weight:normal;">Bunker Edition v2.1</span></h1>
         
         <div class="upload">
             <form method="POST" action="?action=upload" enctype="multipart/form-data">
@@ -163,7 +171,7 @@ if (is_dir($config['storageDir'])) {
                     <?php if($config['password']): ?>
                         <input type="password" name="password" placeholder="Contraseña de acceso">
                     <?php endif; ?>
-                    <button type="submit" class="btn btn-up"> Iniciar Subida</button>
+                    <button type="submit" class="btn btn-up">🚀 Iniciar Subida</button>
                 </div>
             </form>
         </div>
