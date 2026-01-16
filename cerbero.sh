@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================
-# INSTALADOR CERBERO V2.0 - BUNKER EDITION
+# INSTALADOR CERBERO V2.1 - BUNKER EDITION
 # ==========================================
 
 # Colores
