@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'upload') {
         
         // A. Chequeo de Malware
         if (isMalware($_FILES['file']['tmp_name'])) {
-            die("🚨 ALERTA DE SEGURIDAD: Se ha detectado un archivo ejecutable/script. Subida rechazada.");
+            die(" ALERTA DE SEGURIDAD: Se ha detectado un archivo ejecutable/script. Subida rechazada.");
         }
 
         // B. Saneamiento de nombre
@@ -161,7 +161,7 @@ if (is_dir($config['storageDir'])) {
 </head>
 <body>
     <div class="container">
-        <h1>🛡️ Cerbero <span style="font-size:0.6em; color:#bdc3c7; font-weight:normal;">Bunker Edition v2.1</span></h1>
+        <h1> Cerbero <span style="font-size:0.6em; color:#bdc3c7; font-weight:normal;">Bunker Edition v2.1</span></h1>
         
         <div class="upload">
             <form method="POST" action="?action=upload" enctype="multipart/form-data">
@@ -171,7 +171,7 @@ if (is_dir($config['storageDir'])) {
                     <?php if($config['password']): ?>
                         <input type="password" name="password" placeholder="Contraseña de acceso">
                     <?php endif; ?>
-                    <button type="submit" class="btn btn-up">🚀 Iniciar Subida</button>
+                    <button type="submit" class="btn btn-up"> Iniciar Subida</button>
                 </div>
             </form>
         </div>
