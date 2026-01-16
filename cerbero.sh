@@ -1,79 +1,109 @@
 #!/bin/bash
 
-# Colores para que se vea bonito
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m'
+# ==========================================
+# INSTALADOR CERBERO V2.0 - BUNKER EDITION
+# ==========================================
 
-echo -e "${GREEN}=== INSTALADOR AUTOMÁTICO DE CERBERO-PHP ===${NC}"
+# Colores
+G='\033[0;32m' # Verde
+R='\033[0;31m' # Rojo
+Y='\033[1;33m' # Amarillo
+NC='\033[0m'   # Sin color
 
-# 1. Verificar si es root
+echo -e "${G}>>> INICIANDO INSTALACIÓN DE CERBERO BUNKER...${NC}"
+
+# 1. Verificar Superusuario
 if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}Por favor, ejecuta este script como root (sudo ./install.sh)${NC}"
-  exit
+  echo -e "${R}[ERROR] Debes ejecutar esto como root (sudo ./install.sh)${NC}"
+  exit 1
 fi
 
-# 2. Instalar Dependencias
-echo -e "${GREEN}[1/5] Instalando Apache y PHP...${NC}"
-apt update
-apt install apache2 libapache2-mod-php php-cli -y
+# 2. Instalar Dependencias (Apache + PHP)
+echo -e "${Y}[1/5] Instalando servidor web y PHP...${NC}"
+apt update -qq
+apt install apache2 libapache2-mod-php php-cli -y -qq
 
-# 3. Configurar Directorios y Permisos (Hardening)
-echo -e "${GREEN}[2/5] Configurando carpetas seguras...${NC}"
-mkdir -p /var/www/html/archivos
-# Carpeta temporal fuera del alcance público (Seguridad)
-mkdir -p /var/www/tmp_cache 
+# 3. Estructura de Carpetas (SEGURIDAD CRÍTICA)
+echo -e "${Y}[2/5] Creando boveda aislada fuera del web root...${NC}"
 
-# Copiar el archivo index.php
+# Definir rutas
+WEB_ROOT="/var/www/html"
+SAFE_DIR="/var/www/cerbero_boveda"
+TMP_DIR="/var/www/cerbero_tmp"
+
+# Limpiar y crear
+rm -f $WEB_ROOT/index.html
+mkdir -p $SAFE_DIR
+mkdir -p $TMP_DIR
+
+# Copiar el código
 if [ -f "index.php" ]; then
-    cp index.php /var/www/html/index.php
-    rm /var/www/html/index.html 2>/dev/null
+    cp index.php $WEB_ROOT/index.php
+    echo -e "${G}    -> Código copiado exitosamente.${NC}"
 else
-    echo -e "${RED}Error: No encuentro index.php en esta carpeta.${NC}"
+    echo -e "${R}[ERROR] No encuentro el archivo index.php en esta carpeta.${NC}"
     exit 1
 fi
 
-# Asignar permisos estrictos (Solo Apache puede tocar esto)
-chown -R www-data:www-data /var/www/html/archivos
-chown -R www-data:www-data /var/www/tmp_cache
-chmod -R 770 /var/www/html/archivos
-chmod -R 700 /var/www/tmp_cache
+# 4. Permisos y Hardening (Anti-VoidLink)
+echo -e "${Y}[3/5] Aplicando permisos de grado militar...${NC}"
 
-# 4. Seguridad Anti-Scripts (Evitar hacking)
-echo -e "${GREEN}[3/5] Aplicando parches de seguridad...${NC}"
-cat <<EOF > /var/www/html/archivos/.htaccess
-# Bloquear ejecución de PHP en la carpeta de subidas
-<FilesMatch "\.(php|php5|phtml|pl|py|cgi|sh)$">
-    Require all denied
-</FilesMatch>
-Options -Indexes
+# Asignar dueño a Apache
+chown -R www-data:www-data $SAFE_DIR
+chown -R www-data:www-data $TMP_DIR
+chown -R www-data:www-data $WEB_ROOT
+
+# Permisos 770: Solo Apache y Root pueden entrar. Internet NO puede entrar.
+chmod -R 770 $SAFE_DIR
+chmod -R 700 $TMP_DIR
+
+# Capa Extra: .htaccess dentro de la boveda (Por si alguien mueve la carpeta por error)
+cat <<EOF > $SAFE_DIR/.htaccess
+# BLOQUEO TOTAL DE EJECUCIÓN
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+ForceType application/octet-stream
+Options -Indexes -ExecCGI -FollowSymLinks
+Require all denied
 EOF
+echo -e "${G}    -> Escudo .htaccess activado en la boveda.${NC}"
 
-# 5. Configurar PHP.ini Automáticamente (La parte difícil)
-echo -e "${GREEN}[4/5] Configurando PHP para soportar 10 GB...${NC}"
+# 5. Configuración Automática de PHP (Soporte 10GB)
+echo -e "${Y}[4/5] Hackeando php.ini para soportar 10 GB...${NC}"
 
-# Buscar el php.ini activo de Apache
+# Detectar php.ini activo
 PHP_INI=$(php -i | grep "Configuration File (php.ini) Path" | awk '{print $6}')/apache2/php.ini
 
 if [ -f "$PHP_INI" ]; then
-    # Usamos sed para reemplazar los valores automáticamente
+    # Backup por seguridad
+    cp $PHP_INI "$PHP_INI.bak"
+    
+    # Inyección de configuración
     sed -i 's/^upload_max_filesize.*/upload_max_filesize = 10G/' $PHP_INI
     sed -i 's/^post_max_size.*/post_max_size = 10G/' $PHP_INI
     sed -i 's/^memory_limit.*/memory_limit = 512M/' $PHP_INI
-    # Descomentar y configurar la carpeta temporal
-    sed -i 's|^;upload_tmp_dir.*|upload_tmp_dir = /var/www/tmp_cache|' $PHP_INI
-    sed -i 's|^upload_tmp_dir.*|upload_tmp_dir = /var/www/tmp_cache|' $PHP_INI
+    sed -i 's/^max_execution_time.*/max_execution_time = 0/' $PHP_INI
     
-    echo "PHP configurado en: $PHP_INI"
+    # Configurar carpeta temporal segura (Evita Out of Memory)
+    # Comentar la línea si existe para evitar duplicados y agregar la nuestra
+    sed -i '/^upload_tmp_dir/d' $PHP_INI
+    echo "upload_tmp_dir = $TMP_DIR" >> $PHP_INI
+    
+    echo -e "${G}    -> php.ini configurado en: $PHP_INI${NC}"
 else
-    echo -e "${RED}No se pudo encontrar php.ini automáticamente. Revisa el README.${NC}"
+    echo -e "${R}[ERROR] No pude encontrar el php.ini automáticamente.${NC}"
 fi
 
-# 6. Reiniciar Apache
-echo -e "${GREEN}[5/5] Reiniciando servidor...${NC}"
+# 6. Reiniciar Servicios
+echo -e "${Y}[5/5] Reiniciando Apache...${NC}"
 systemctl restart apache2
 
-echo -e "${GREEN}==============================================${NC}"
-echo -e "${GREEN}¡INSTALACIÓN COMPLETADA!${NC}"
-echo -e "Accede a: http://$(hostname -I | cut -d' ' -f1)"
-echo -e "${GREEN}==============================================${NC}"
+echo -e "${G}==============================================${NC}"
+echo -e "${G}     ¡INSTALACIÓN COMPLETADA CON ÉXITO!      ${NC}"
+echo -e "${G}==============================================${NC}"
+echo -e "Accede a tu servidor seguro aquí:"
+echo -e " http://$(hostname -I | cut -d' ' -f1)"
+echo -e ""
+echo -e "Tus archivos se guardan en: $SAFE_DIR"
+echo -e "(Esta carpeta es invisible para internet)"
